@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>JUNGLE SIEGE — FPS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { overflow: hidden; background: #000; font-family: 'Courier New', monospace; }
+
+  /* ── START SCREEN ── */
+  #start-screen {
+    position: fixed; inset: 0; z-index: 9999;
+    background: linear-gradient(135deg, #0a1a0a 0%, #0d2b0d 40%, #071407 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 24px; color: #fff;
+  }
+  #start-screen .logo {
+    font-size: clamp(2.4rem, 8vw, 5rem); font-weight: 900; letter-spacing: .18em;
+    text-transform: uppercase; color: #7fff4f;
+    text-shadow: 0 0 40px #4ef04e, 0 0 80px #2aa02a;
+    animation: pulse-logo 2s ease-in-out infinite;
+  }
+  @keyframes pulse-logo { 0%,100%{text-shadow:0 0 40px #4ef04e,0 0 80px #2aa02a} 50%{text-shadow:0 0 80px #7fff4f,0 0 140px #4ef04e} }
+  #start-screen .subtitle {
+    font-size: clamp(.9rem, 2.5vw, 1.3rem); letter-spacing: .35em; color: #aaa;
+    text-transform: uppercase;
+  }
+  #start-screen .mode-badge {
+    background: #ff2222; color: #fff; padding: 6px 22px; border-radius: 4px;
+    font-size: .85rem; letter-spacing: .2em; font-weight: 700;
+    box-shadow: 0 0 20px #ff000066;
+  }
+  .start-btn {
+    margin-top: 12px; padding: 16px 56px; font-size: 1.2rem; font-weight: 700;
+    letter-spacing: .25em; text-transform: uppercase; cursor: pointer;
+    background: #7fff4f; color: #071407; border: none; border-radius: 6px;
+    box-shadow: 0 0 30px #4ef04e88; transition: all .15s;
+  }
+  .start-btn:hover { background: #a0ff70; box-shadow: 0 0 50px #7fff4f; transform: scale(1.04); }
+  #start-screen .instructions {
+    max-width: 420px; text-align: center; color: #888; font-size: .82rem;
+    line-height: 1.8; letter-spacing: .05em;
+  }
+  #start-screen .instructions span { color: #7fff4f; }
+
+  /* ── GAME OVER SCREEN ── */
+  #gameover-screen {
+    position: fixed; inset: 0; z-index: 9998;
+    background: rgba(0,0,0,.88); backdrop-filter: blur(6px);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    gap: 20px; color: #fff;
+  }
+  #gameover-screen.show { display: flex; }
+  #gameover-screen .go-title {
+    font-size: clamp(2.5rem, 9vw, 5.5rem); font-weight: 900; letter-spacing: .15em;
+    color: #ff3333; text-shadow: 0 0 60px #ff000088;
+    animation: shake-go .4s ease;
+  }
+  @keyframes shake-go { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-12px)} 40%{transform:translateX(12px)} 60%{transform:translateX(-8px)} 80%{transform:translateX(8px)} }
+  #gameover-screen .go-score { font-size: 1.4rem; color: #ccc; letter-spacing: .1em; }
+  #gameover-screen .go-score span { color: #ffd700; font-size: 2rem; font-weight: 900; }
+
+  /* ── HUD ── */
+  #hud { position: fixed; inset: 0; z-index: 100; pointer-events: none; }
+
+  /* crosshair */
+  #crosshair {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 24px; height: 24px;
+  }
+  #crosshair::before, #crosshair::after {
+    content:''; position: absolute; background: rgba(255,255,255,.85);
+    box-shadow: 0 0 4px rgba(0,0,0,.8);
+  }
+  #crosshair::before { width: 2px; height: 100%; left: 50%; transform: translateX(-50%); }
+  #crosshair::after  { height: 2px; width: 100%; top: 50%; transform: translateY(-50%); }
+  #crosshair .center-dot {
+    position: absolute; width: 4px; height: 4px; background: #7fff4f;
+    border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    box-shadow: 0 0 6px #7fff4f;
+  }
+  #crosshair.shoot { animation: ch-shoot .12s ease; }
+  @keyframes ch-shoot { 0%{transform:translate(-50%,-50%) scale(1.8)} 100%{transform:translate(-50%,-50%) scale(1)} }
+
+  /* health bar */
+  #health-container {
+    position: absolute; bottom: 28px; left: 28px;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  #health-label { font-size: .7rem; letter-spacing: .18em; color: #ccc; }
+  #health-bar-bg {
+    width: 220px; height: 14px; background: rgba(0,0,0,.5);
+    border: 1px solid rgba(255,255,255,.2); border-radius: 3px; overflow: hidden;
+  }
+  #health-bar {
+    height: 100%; width: 100%; background: linear-gradient(90deg, #ff3333, #ff6644);
+    transition: width .2s, background .3s; border-radius: 3px;
+    box-shadow: 0 0 10px #ff333388;
+  }
+  #health-text { font-size: .75rem; color: #fff; letter-spacing: .1em; }
+
+  /* ammo / score */
+  #score-display {
+    position: absolute; top: 20px; right: 24px;
+    text-align: right;
+  }
+  #score-display .score-val {
+    font-size: 2rem; font-weight: 900; color: #ffd700;
+    letter-spacing: .08em; text-shadow: 0 0 20px #ffd70088;
+  }
+  #score-display .score-lbl { font-size: .65rem; letter-spacing: .25em; color: #888; }
+  #kills-display {
+    position: absolute; top: 68px; right: 24px; text-align: right;
+  }
+  #kills-display .kills-val { font-size: 1.2rem; font-weight: 700; color: #ff4444; }
+  #kills-display .kills-lbl { font-size: .6rem; letter-spacing: .2em; color: #888; }
+
+  /* mini-map */
+  #minimap-container {
+    position: absolute; top: 20px; left: 20px;
+    width: 130px; height: 130px;
+  }
+  #minimap-container .map-label {
+    font-size: .55rem; letter-spacing: .2em; color: #888; margin-bottom: 3px;
+    text-align: center;
+  }
+  #minimap-canvas {
+    width: 130px; height: 130px; border-radius: 50%;
+    border: 2px solid rgba(127,255,79,.35);
+    box-shadow: 0 0 14px rgba(0,0,0,.7), inset 0 0 20px rgba(0,0,0,.5);
+    display: block;
+  }
+
+  /* damage vignette */
+  #damage-vignette {
+    position: fixed; inset: 0; z-index: 200; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(255,0,0,.0) 100%);
+    opacity: 0; transition: opacity .08s;
+  }
+  #damage-vignette.flash { opacity: 1; animation: dmg-flash .5s ease forwards; }
+  @keyframes dmg-flash {
+    0%  { background: radial-gradient(ellipse at center, transparent 30%, rgba(220,0,0,.65) 100%); }
+    100%{ background: radial-gradient(ellipse at center, transparent 40%, rgba(220,0,0,.0) 100%); opacity:0; }
+  }
+
+  /* ammo indicator */
+  #ammo-display {
+    position: absolute; bottom: 28px; right: 28px;
+    font-size: 1.5rem; font-weight: 900; color: #fff;
+    letter-spacing: .05em;
+  }
+  #ammo-display span { color: #888; font-size: .9rem; }
+
+  /* wave display */
+  #wave-display {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 2.2rem; font-weight: 900; color: #fff; letter-spacing: .2em;
+    opacity: 0; pointer-events: none; text-shadow: 0 0 30px #fff;
+    text-transform: uppercase;
+  }
+  #wave-display.show { animation: wave-pop .8s ease forwards; }
+  @keyframes wave-pop {
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}
+    30%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}
+    70%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    100%{opacity:0;transform:translate(-50%,-50%) scale(1)}
+  }
+
+  /* hit marker */
+  #hit-marker {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    font-size: 1.2rem; color: #ff4444; font-weight: 900;
+    opacity: 0; pointer-events: none;
+  }
+  #hit-marker.show { animation: hm .35s ease forwards; }
+  @keyframes hm { 0%{opacity:1;transform:translate(-50%,-100%)} 100%{opacity:0;transform:translate(-50%,-180%)} }
+
+  /* lock indicator */
+  #lock-indicator {
+    position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%);
+    font-size: .7rem; letter-spacing: .18em; color: rgba(255,255,255,.45);
+    text-transform: uppercase;
+  }
+
+  /* ── MOBILE JOYSTICK ── */
+  #mobile-controls {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 300;
+    pointer-events: none; display: none;
+  }
+  #joystick-move-zone, #joystick-look-zone {
+    position: absolute; bottom: 20px; width: 150px; height: 150px;
+    border-radius: 50%; pointer-events: all;
+  }
+  #joystick-move-zone { left: 20px; }
+  #joystick-look-zone { right: 20px; }
+  .joystick-bg {
+    width: 100%; height: 100%; border-radius: 50%;
+    background: rgba(255,255,255,.08);
+    border: 2px solid rgba(255,255,255,.2);
+    position: relative;
+  }
+  .joystick-knob {
+    position: absolute; width: 56px; height: 56px; border-radius: 50%;
+    background: rgba(127,255,79,.4); border: 2px solid rgba(127,255,79,.7);
+    top: 50%; left: 50%; transform: translate(-50%,-50%);
+    transition: background .1s;
+  }
+  #mobile-shoot-btn {
+    position: fixed; bottom: 80px; right: 185px; z-index: 300;
+    width: 70px; height: 70px; border-radius: 50%;
+    background: rgba(255,50,50,.55); border: 3px solid rgba(255,80,80,.8);
+    color: #fff; font-size: .75rem; font-weight: 700; letter-spacing: .08em;
+    pointer-events: all; cursor: pointer; display: none;
+    align-items: center; justify-content: center; text-align: center;
+    text-transform: uppercase;
+  }
+
+  a-scene { display: block; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════ START SCREEN ══════════════ -->
+<div id="start-screen">
+  <div class="logo">JUNGLE SIEGE</div>
+  <div class="subtitle">First Person Shooter</div>
+  <div class="mode-badge">⚠ HARD MODE ACTIVE</div>
+  <button class="start-btn" onclick="startGame()">ENTER COMBAT</button>
+  <div class="instructions">
+    <span>WASD</span> — Move &nbsp;|&nbsp; <span>Mouse</span> — Aim &nbsp;|&nbsp; <span>Click</span> — Fire<br>
+    <span>Mobile:</span> Left joystick to move, Right joystick to look, Red button to fire<br><br>
+    Survive the jungle. Enemies deal <span>massive damage</span>.<br>
+    Kill them all before they reach you.
+  </div>
+</div>
+
+<!-- ══════════════ GAME OVER SCREEN ══════════════ -->
+<div id="gameover-screen">
+  <div class="go-title">ELIMINATED</div>
+  <div class="go-score">SCORE: <span id="go-score-val">0</span></div>
+  <div class="go-score">KILLS: <span id="go-kills-val" style="color:#ff4444">0</span></div>
+  <button class="start-btn" onclick="restartGame()" style="margin-top:10px">TRY AGAIN</button>
+</div>
+
+<!-- ══════════════ HUD ══════════════ -->
+<div id="hud" style="display:none">
+  <div id="crosshair"><div class="center-dot"></div></div>
+
+  <div id="minimap-container">
+    <div class="map-label">RADAR</div>
+    <canvas id="minimap-canvas" width="130" height="130"></canvas>
+  </div>
+
+  <div id="score-display">
+    <div class="score-lbl">SCORE</div>
+    <div class="score-val" id="score-val">0</div>
+  </div>
+  <div id="kills-display">
+    <div class="kills-lbl">KILLS</div>
+    <div class="kills-val" id="kills-val">0</div>
+  </div>
+
+  <div id="health-container">
+    <div class="health-label">HEALTH</div>
+    <div id="health-bar-bg"><div id="health-bar"></div></div>
+    <div id="health-text">100 / 100</div>
+  </div>
+
+  <div id="ammo-display">∞ <span>AMMO</span></div>
+  <div id="wave-display"></div>
+  <div id="hit-marker">✦</div>
+  <div id="lock-indicator">CLICK TO CAPTURE MOUSE</div>
+</div>
+
+<div id="damage-vignette"></div>
+
+<!-- ══════════════ MOBILE CONTROLS ══════════════ -->
+<div id="mobile-controls">
+  <div id="joystick-move-zone">
+    <div class="joystick-bg" id="move-bg">
+      <div class="joystick-knob" id="move-knob"></div>
+    </div>
+  </div>
+  <div id="joystick-look-zone">
+    <div class="joystick-bg" id="look-bg">
+      <div class="joystick-knob" id="look-knob"></div>
+    </div>
+  </div>
+</div>
+<button id="mobile-shoot-btn" onclick="playerShoot()">FIRE</button>
+
+<!-- ══════════════ A-FRAME SCENE ══════════════ -->
+<a-scene id="game-scene" style="display:none"
+  vr-mode-ui="enabled:false"
+  renderer="antialias:true; colorManagement:true; physicallyCorrectLights:true"
+  fog="type:none">
+
+  <a-assets>
+    <!-- inline SVG textures – no external URLs -->
+    <img id="tex-bark"  src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjM2QyMTBhIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjgiIGhlaWdodD0iNjQiIGZpbGw9IiMyYTE0MDQiIG9wYWNpdHk9Ii41Ii8+PHJlY3QgeD0iMTYiIHk9IjAiIHdpZHRoPSI0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjNGQyZDBkIiBvcGFjaXR5PSIuNSIvPjxyZWN0IHg9IjMyIiB5PSIwIiB3aWR0aD0iNiIgaGVpZ2h0PSI2NCIgZmlsbD0iIzJhMTQwNCIgb3BhY2l0eT0iLjYiLz48cmVjdCB4PSI0OCIgeT0iMCIgd2lkdGg9IjUiIGhlaWdodD0iNjQiIGZpbGw9IiM0ZDJkMGQiIG9wYWNpdHk9Ii40Ii8+PHJlY3QgeD0iNTYiIHk9IjAiIHdpZHRoPSIzIiBoZWlnaHQ9IjY0IiBmaWxsPSIjMmExNDA0IiBvcGFjaXR5PSIuNSIvPjwvc3ZnPg==">
+    <img id="tex-leaf"  src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjMWE1MjE0Ii8+PGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTIiIGZpbGw9IiMyMjZiMWEiIG9wYWNpdHk9Ii42Ii8+PGNpcmNsZSBjeD0iNDgiIGN5PSIzMiIgcj0iMTAiIGZpbGw9IiMxNDQwMGYiIG9wYWNpdHk9Ii42Ii8+PGNpcmNsZSBjeD0iMjQiIGN5PSI0OCIgcj0iMTQiIGZpbGw9IiMyYTc4MjAiIG9wYWNpdHk9Ii43Ii8+PGNpcmNsZSBjeD0iNTYiIGN5PSIxMiIgcj0iOCIgZmlsbD0iIzFhNTIxNCIgb3BhY2l0eT0iLjUiLz48L3N2Zz4=">
+    <img id="tex-grass" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjMmQ1YTE0Ii8+PHJlY3QgeD0iNCIgeT0iMjAiIHdpZHRoPSIzIiBoZWlnaHQ9IjE4IiBmaWxsPSIjMzg3MzFhIi8+PHJlY3QgeD0iMTIiIHk9IjE1IiB3aWR0aD0iMiIgaGVpZ2h0PSIyMiIgZmlsbD0iIzQ0OGEyMiIvPjxyZWN0IHg9IjIwIiB5PSIyMiIgd2lkdGg9IjQiIGhlaWdodD0iMTYiIGZpbGw9IiMzMDVjMTAiLz48cmVjdCB4PSIzMCIgeT0iMTgiIHdpZHRoPSIyIiBoZWlnaHQ9IjIwIiBmaWxsPSIjNGE5ZTI4Ii8+PHJlY3QgeD0iNDAiIHk9IjI0IiB3aWR0aD0iMyIgaGVpZ2h0PSIxNSIgZmlsbD0iIzM4NzMxYSIvPjxyZWN0IHg9IjUwIiB5PSIxNiIgd2lkdGg9IjIiIGhlaWdodD0iMjQiIGZpbGw9IiMyZDVhMTQiLz48cmVjdCB4PSI1OCIgeT0iMjEiIHdpZHRoPSIzIiBoZWlnaHQ9IjE3IiBmaWxsPSIjNDQ4YTIyIi8+PC9zdmc+">
+    <img id="tex-rock"  src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjNTU1NTU1Ii8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjNjY2NjY2IiBvcGFjaXR5PSIuNSIvPjxyZWN0IHg9IjMyIiB5PSIzMiIgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiBmaWxsPSIjNDQ0NDQ0IiBvcGFjaXR5PSIuNSIvPjxsaW5lIHgxPSIwIiB5MT0iMzIiIHgyPSI2NCIgeTI9IjMyIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iLjMiLz48bGluZSB4MT0iMzIiIHkxPSIwIiB4Mj0iMzIiIHkyPSI2NCIgc3Ryb2tlPSIjMzMzIiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9Ii4zIi8+PC9zdmc+">
+    <img id="tex-wall"  src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjOGE3NTYwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjMyIiBoZWlnaHQ9IjE2IiBmaWxsPSIjNzc2NjUwIiBvcGFjaXR5PSIuOCIvPjxyZWN0IHg9IjMyIiB5PSIxNiIgd2lkdGg9IjMyIiBoZWlnaHQ9IjE2IiBmaWxsPSIjNzc2NjUwIiBvcGFjaXR5PSIuOCIvPjxyZWN0IHg9IjAiIHk9IjMyIiB3aWR0aD0iMzIiIGhlaWdodD0iMTYiIGZpbGw9Ijc3NjY1MCIgb3BhY2l0eT0iLjgiLz48cmVjdCB4PSIzMiIgeT0iNDgiIHdpZHRoPSIzMiIgaGVpZ2h0PSIxNiIgZmlsbD0iIzc3NjY1MCIgb3BhY2l0eT0iLjgiLz48bGluZSB4MT0iMCIgeTE9IjE2IiB4Mj0iNjQiIHkyPSIxNiIgc3Ryb2tlPSIjNTU0NDMwIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxsaW5lIHgxPSIwIiB5MT0iMzIiIHgyPSI2NCIgeTI9IjMyIiBzdHJva2U9IiM1NTQ0MzAiIHN0cm9rZS13aWR0aD0iMS41Ii8+PGxpbmUgeDE9IjAiIHkxPSI0OCIgeDI9IjY0IiB5Mj0iNDgiIHN0cm9rZT0iIzU1NDQzMCIgc3Ryb2tlLXdpZHRoPSIxLjUiLz48bGluZSB4MT0iMzIiIHkxPSIwIiB4Mj0iMzIiIHkyPSIxNiIgc3Ryb2tlPSIjNTU0NDMwIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxsaW5lIHgxPSIxNiIgeTE9IjE2IiB4Mj0iMTYiIHkyPSIzMiIgc3Ryb2tlPSIjNTU0NDMwIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxsaW5lIHgxPSI0OCIgeTE9IjE2IiB4Mj0iNDgiIHkyPSIzMiIgc3Ryb2tlPSIjNTU0NDMwIiBzdHJva2Utd2lkdGg9IjEuNSIvPjwvc3ZnPg==">
+    <img id="tex-wood"  src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjN2I1NTJhIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjgiIGZpbGw9IiM2YTQ2MWUiIG9wYWNpdHk9Ii42Ii8+PHJlY3QgeD0iMCIgeT0iMTYiIHdpZHRoPSI2NCIgaGVpZ2h0PSI4IiBmaWxsPSIjOGM2NDMyIiBvcGFjaXR5PSIuNiIvPjxyZWN0IHg9IjAiIHk9IjMyIiB3aWR0aD0iNjQiIGhlaWdodD0iOCIgZmlsbD0iIzZhNDYxZSIgb3BhY2l0eT0iLjYiLz48cmVjdCB4PSIwIiB5PSI0OCIgd2lkdGg9IjY0IiBoZWlnaHQ9IjgiIGZpbGw9IiM4YzY0MzIiIG9wYWNpdHk9Ii42Ii8+PC9zdmc+">
+  </a-assets>
+
+  <!-- Camera rig -->
+  <a-entity id="camera-rig" position="0 0 0">
+    <a-entity id="player-camera" camera
+      look-controls="pointerLockEnabled:true; reverseMouseDrag:false"
+      position="0 1.65 0"
+      wasd-controls="enabled:false">
+
+      <!-- Gun model -->
+      <a-entity id="gun-root" position="0.28 -0.22 -0.5">
+        <!-- Barrel -->
+        <a-box id="gun-barrel"
+          width="0.045" height="0.045" depth="0.38"
+          color="#1a1a1a" position="0 0 0"></a-box>
+        <!-- Body -->
+        <a-box width="0.09" height="0.1" depth="0.22"
+          color="#222" position="0 -0.01 0.06"></a-box>
+        <!-- Handle -->
+        <a-box width="0.07" height="0.14" depth="0.07"
+          color="#111" position="0 -0.1 0.13" rotation="-15 0 0"></a-box>
+        <!-- Sight -->
+        <a-box width="0.015" height="0.025" depth="0.04"
+          color="#333" position="0 0.058 0.04"></a-box>
+        <!-- Muzzle flash (hidden by default) -->
+        <a-entity id="muzzle-flash"
+          position="0 0 -0.22"
+          visible="false">
+          <a-sphere radius="0.06" color="#ffee44"
+            material="emissive:#ffcc00; emissiveIntensity:3; opacity:0.9; transparent:true"
+            position="0 0 0"></a-sphere>
+          <a-sphere radius="0.03" color="#ffffff"
+            material="emissive:#ffffff; emissiveIntensity:5; opacity:1"
+            position="0 0 0.02"></a-sphere>
+        </a-entity>
+      </a-entity>
+    </a-entity>
+  </a-entity>
+
+  <!-- Ground -->
+  <a-plane id="ground"
+    width="300" height="300" rotation="-90 0 0"
+    src="#tex-grass" repeat="40 40"
+    color="#3a6b1e"
+    material="roughness:1; metalness:0"></a-plane>
+
+  <!-- Sky -->
+  <a-sky color="#1a3a20"></a-sky>
+
+  <!-- Ambient light -->
+  <a-light type="ambient" color="#6a9e60" intensity="0.7"></a-light>
+  <!-- Sun -->
+  <a-light type="directional" color="#ffe8a0" intensity="1.2"
+    position="30 60 -20" cast-shadow="true"></a-light>
+  <!-- Fog atmosphere light -->
+  <a-light type="point" color="#2aff4a" intensity="0.3" position="0 10 0"></a-light>
+
+  <!-- Static world container (filled by JS) -->
+  <a-entity id="world-container"></a-entity>
+  <!-- Enemy container -->
+  <a-entity id="enemy-container"></a-entity>
+  <!-- Bullet/FX container -->
+  <a-entity id="fx-container"></a-entity>
+
+</a-scene>
+
+<!-- ══════════════ GAME SCRIPT ══════════════ -->
+<script>
+'use strict';
+
+// ── GLOBALS ─────────────────────────────────
+const HALF_MAP   = 120;
+const ENEMY_SPEED_BASE  = 2.8;
+const ENEMY_DAMAGE      = 22;   // Hard mode
+const ENEMY_HP_BASE     = 50;
+const PLAYER_MAX_HP     = 100;
+const SHOOT_COOLDOWN    = 180;  // ms
+const SPAWN_INTERVAL    = 3200; // ms
+const MAX_ENEMIES       = 18;
+const BULLET_DMG        = 35;
+const SCORE_PER_KILL    = 150;
+
+let gameState = 'menu'; // menu | playing | dead
+let score = 0, kills = 0, playerHP = PLAYER_MAX_HP;
+let lastShot = 0, spawnTimer = null, enemyUpdateTimer = null;
+let enemies = [];
+let waveNum = 0;
+let recoilActive = false;
+let minimapCtx;
+let cameraRig, playerCam, worldContainer, enemyContainer, fxContainer;
+
+// ── MOBILE DETECTION ────────────────────────
+const isMobile = /Android|iPhone|iPad|iPod|Touch/i.test(navigator.userAgent) ||
+                 (navigator.maxTouchPoints > 1);
+
+// ── A-FRAME HELPERS ─────────────────────────
+function v3(el) {
+  const p = el.getAttribute('position');
+  return { x: p.x, y: p.y, z: p.z };
+}
+function dist2D(a, b) {
+  return Math.hypot(a.x - b.x, a.z - b.z);
+}
+function randRange(lo, hi) { return lo + Math.random() * (hi - lo); }
+function randInt(lo, hi)   { return Math.floor(randRange(lo, hi + 1)); }
+
+// ── WORLD GENERATION ────────────────────────
+function buildWorld() {
+  const wc = document.getElementById('world-container');
+  wc.innerHTML = '';
+
+  // Helper to add element
+  function add(tag, attrs) {
+    cons
